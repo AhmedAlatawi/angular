@@ -16,6 +16,7 @@ export interface SemanticDependencyResult {
    * The files that need to be re-emitted.
    */
   needsEmit: Set<AbsoluteFsPath>;
+  needsTypeCheckEmit: Set<AbsoluteFsPath>;
 
   /**
    * The newly built graph that represents the current compilation.
@@ -31,6 +32,10 @@ export interface SemanticDependencyResult {
  */
 export class OpaqueSymbol extends SemanticSymbol {
   isPublicApiAffected(): false {
+    return false;
+  }
+
+  isTypeCheckEmitAffected(): false {
     return false;
   }
 }
@@ -148,13 +153,16 @@ export class SemanticDepGraphUpdater {
       // logically changed.
       return {
         needsEmit: new Set<AbsoluteFsPath>(),
+        needsTypeCheckEmit: new Set<AbsoluteFsPath>(),
         newGraph: this.newGraph,
       };
     }
 
     const needsEmit = this.determineInvalidatedFiles(this.priorGraph);
+    const needsTypeCheckEmit = this.determineInvalidatedTypeCheckFiles(this.priorGraph);
     return {
       needsEmit,
+      needsTypeCheckEmit,
       newGraph: this.newGraph,
     };
   }
@@ -187,6 +195,18 @@ export class SemanticDepGraphUpdater {
     }
 
     return needsEmit;
+  }
+
+  private determineInvalidatedTypeCheckFiles(priorGraph: SemanticDepGraph): Set<AbsoluteFsPath> {
+    const needsTypeCheckEmit = new Set<AbsoluteFsPath>();
+    for (const symbol of this.newGraph.symbolByDecl.values()) {
+      const previousSymbol = priorGraph.getEquivalentSymbol(symbol);
+      if (previousSymbol === null || symbol.isTypeCheckEmitAffected(previousSymbol)) {
+        needsTypeCheckEmit.add(symbol.path);
+      }
+    }
+
+    return needsTypeCheckEmit;
   }
 
   getSemanticReference(decl: ClassDeclaration, expr: Expression): SemanticReference {

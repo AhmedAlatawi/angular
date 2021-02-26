@@ -43,6 +43,10 @@ export class PipeSymbol extends SemanticSymbol {
 
     return this.name !== previousSymbol.name;
   }
+
+  isTypeCheckEmitAffected(previousSymbol: SemanticSymbol): boolean {
+    return this.isPublicApiAffected(previousSymbol);
+  }
 }
 
 export class PipeDecoratorHandler implements

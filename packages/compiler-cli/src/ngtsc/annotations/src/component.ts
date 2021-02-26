@@ -27,7 +27,7 @@ import {SubsetOfKeys} from '../../util/src/typescript';
 
 import {ResourceLoader} from './api';
 import {createValueHasWrongTypeError, getDirectiveDiagnostics, getProviderDiagnostics} from './diagnostics';
-import {DirectiveSymbol, extractDirectiveMetadata, parseFieldArrayValue} from './directive';
+import {DirectiveSymbol, extractDirectiveMetadata, extractSemanticTypeParameters, parseFieldArrayValue} from './directive';
 import {compileNgFactoryDefField} from './factory';
 import {generateSetClassMetadataCall} from './metadata';
 import {NgModuleSymbol} from './ng_module';
@@ -433,9 +433,11 @@ export class ComponentDecoratorHandler implements
   }
 
   symbol(node: ClassDeclaration, analysis: Readonly<ComponentAnalysisData>): ComponentSymbol {
+    const typeParameters = extractSemanticTypeParameters(node);
+
     return new ComponentSymbol(
         node, analysis.meta.selector, analysis.inputs.propertyNames, analysis.outputs.propertyNames,
-        analysis.meta.exportAs);
+        analysis.meta.exportAs, typeParameters);
   }
 
   register(node: ClassDeclaration, analysis: ComponentAnalysisData): void {

@@ -61,6 +61,7 @@ export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileType
       state = {
         kind: BuildStateKind.Pending,
         pendingEmit: oldDriver.state.pendingEmit,
+        pendingTypeCheckEmit: oldDriver.state.pendingTypeCheckEmit,
         changedResourcePaths: new Set<AbsoluteFsPath>(),
         changedTsPaths: new Set<string>(),
         lastGood: oldDriver.state.lastGood,
@@ -162,6 +163,7 @@ export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileType
     const state: PendingBuildState = {
       kind: BuildStateKind.Pending,
       pendingEmit: new Set<string>(tsFiles.map(sf => sf.fileName)),
+      pendingTypeCheckEmit: new Set<string>(tsFiles.map(sf => sf.fileName)),
       changedResourcePaths: new Set<AbsoluteFsPath>(),
       changedTsPaths: new Set<string>(),
       lastGood: null,
@@ -184,17 +186,23 @@ export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileType
       return;
     }
 
-    const pendingEmit = this.state.pendingEmit;
+    const {needsEmit, needsTypeCheckEmit, newGraph} = this.state.semanticDepGraphUpdater.finalize();
 
-    const {needsEmit, newGraph} = this.state.semanticDepGraphUpdater.finalize();
+    const pendingEmit = this.state.pendingEmit;
     for (const path of needsEmit) {
       pendingEmit.add(path);
+    }
+
+    const pendingTypeCheckEmit = this.state.pendingTypeCheckEmit;
+    for (const path of needsTypeCheckEmit) {
+      pendingTypeCheckEmit.add(path);
     }
 
     // Update the state to an `AnalyzedBuildState`.
     this.state = {
       kind: BuildStateKind.Analyzed,
       pendingEmit,
+      pendingTypeCheckEmit,
 
       // Since this compilation was successfully analyzed, update the "last good" artifacts to the
       // ones from the current compilation.
@@ -215,6 +223,10 @@ export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileType
       return;
     }
     this.state.lastGood.typeCheckingResults = results;
+
+    for (const fileName of results.keys()) {
+      this.state.pendingTypeCheckEmit.delete(fileName);
+    }
   }
 
   recordSuccessfulEmit(sf: ts.SourceFile): void {
@@ -244,7 +256,7 @@ export class IncrementalDriver implements IncrementalBuild<ClassRecord, FileType
       return null;
     }
 
-    if (this.logicalChanges.has(sf.fileName) || this.state.pendingEmit.has(sf.fileName)) {
+    if (this.logicalChanges.has(sf.fileName) || this.state.pendingTypeCheckEmit.has(sf.fileName)) {
       return null;
     }
 
@@ -294,6 +306,7 @@ interface BaseBuildState {
    * See the README.md for more information on this algorithm.
    */
   pendingEmit: Set<string>;
+  pendingTypeCheckEmit: Set<string>;
 
 
   /**
